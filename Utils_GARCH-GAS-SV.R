@@ -164,9 +164,9 @@ table_mcs_loss <- function(file, w = 0.00, loss = "MSE") {
   
   mcs_0500 <- mcs_1000 <- mcs_2500 <- rep(0, 10)
   
-  mcs_0500[estMCS.quick(pre_out_500 , test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
-  mcs_1000[estMCS.quick(pre_out_1000, test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
-  mcs_2500[estMCS.quick(pre_out_2500, test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
+  mcs_0500[estMCS.quick(pre_out_500 , test = "t.range", B = 5000, l = 1, alpha = 0.25)] <- 1
+  mcs_1000[estMCS.quick(pre_out_1000, test = "t.range", B = 5000, l = 1, alpha = 0.25)] <- 1
+  mcs_2500[estMCS.quick(pre_out_2500, test = "t.range", B = 5000, l = 1, alpha = 0.25)] <- 1
 
   out <- cbind(mcs_0500, mcs_1000, mcs_2500)
   return(out)
@@ -253,6 +253,7 @@ msgarch_fit <- function(spec, data) {
   return(fit_model)
 }
 
+
 estimate_parameters_t <- function (data) {
   obj <- get_nll(data, model = "t", silent = TRUE, hessian = TRUE)
   fit <- stats::nlminb(obj$par, obj$fn, obj$gr,  lower = c(NULL, -5, NULL, NULL), upper = c(NULL, NULL, NULL,  5.52))
@@ -330,14 +331,51 @@ dcsn_fit <- function(data) {
   return(params)
 }
 
-vol_dcsm <- function(r, params) {
+dcsn_lev_fit <- function(data) {
+  par_ini <- grid_dcsn_lev(data)
+  opt_methods <- c("BFGS", "Nelder-Mead", "CG", "SANN")
+  is_error <- TRUE
+  k <- 0
+  params <- NULL
+  while (is_error == TRUE && k < 4) {
+    k <- k + 1
+    expr <- tryCatch({
+      fit <- optim(par = par_ini, dcsn_lev_like, r = data, method = opt_methods[k])
+      if (fit$convergence != 0) stop("No convergence")
+      params <- fit$par
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+    if (isTRUE(expr)) is_error <- FALSE
+  }
+  return(params)
+}
+
+vol_dcsn <- function(r, params) {
   n <- length(r) + 1
   lambda <- rep(0, n)
   lambda_star <- rep(0, n)
   lambda_star[1] <- 0
   lambda[1] <- params[1]
   for (i in 2:n) {
-    lambda_star[i] <- params[2] * lambda_star[i - 1] + params[3] * (r[i - 1]^2 / exp(2 * lambda[i - 1]) - 1)
+    u <- r[i - 1]^2 / exp(2 * lambda[i - 1]) - 1
+    lambda_star[i] <- params[2] * lambda_star[i - 1] + params[3] * u
+    #lambda_star[i] <- params[2] * lambda_star[i - 1] + params[3] * (r[i - 1]^2 / exp(2 * lambda[i - 1]) - 1)
+    lambda[i] <- params[1] + lambda_star[i]
+  }
+  return(exp(lambda))
+}
+
+vol_dcsn_lev <- function(r, params) {
+  n <- length(r) + 1
+  lambda <- rep(0, n)
+  lambda_star <- rep(0, n)
+  lambda_star[1] <- 0
+  lambda[1] <- params[1]
+  for (i in 2:n) {
+    u <- r[i - 1]^2 / exp(2 * lambda[i - 1]) - 1
+    lambda_star[i] <- params[2] * lambda_star[i - 1] + params[3] * u + params[4] * sign(-r[i - 1]) * (u + 1)
     lambda[i] <- params[1] + lambda_star[i]
   }
   return(exp(lambda))
@@ -374,28 +412,70 @@ figarch_fit <- function(spec, data) {
   return(fit_model)
 }
 
-#figarch_n_fit <- function(data) {
-#  out <- withCallingHandlers(
-#    withTimeout(figarch(data, cond_dist = "norm", meanspec = mean_spec(orders = c(0, 0), include_mean = FALSE)), timeout = 180,  onTimeout = "error"),
-#    warning = function(w) {
-#      if (grepl("failed", conditionMessage(w))) {
-#        stop("Convergence error")
-#      }
-#    })
-#  return(out)
-#}
-#
-#
-#figarch_t_fit <- function(data) {
-#  out <- withCallingHandlers(
-#    withTimeout(figarch(data, cond_dist = "std", meanspec = mean_spec(orders = c(0, 0), include_mean = FALSE)), timeout = 180,  onTimeout = "error"),
-#    warning = function(w) {
-#      if (grepl("failed", conditionMessage(w))) {
-#        stop("Convergence error")
-#      }
-#    })
-#  return(out)
-#}
+
+figarch_larger <- function(spec, data) {
+  is_error <- TRUE
+  k <- 0
+  n <- length(data)
+  opt_methods <- c("nloptr", "solnp", "gosolnp", "lbfgs", "nlminb", "hybrid")
+  while (is_error && k < length(opt_methods)) {
+    k <- k + 1
+    is_error <- FALSE
+    expr <- tryCatch({
+      fit_model <- ugarchfit(spec, data, solver = opt_methods[k], fit.control = list(trunclag = 2000))
+      warns <- character(0)
+      fc <- withCallingHandlers(
+        ugarchforecast(fit_model, n.ahead = 1),
+        warning = function(w) {
+          warns <<- c(warns, conditionMessage(w))
+          invokeRestart("muffleWarning")}
+      )
+      if (fit_model@fit$convergence != 0) stop("no convergence")
+      if (any(!is.finite(fc@forecast$sigmaFor))) stop("NaN or Inf in forecast")
+      if (any(grepl("Positivity Contraints", warns))) stop("Positivity Constraints NOT")
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+    if (!isTRUE(expr)) is_error <- TRUE
+  }
+  
+  if (is_error) stop("All optimization methods failed to converge.")
+  return(fit_model)
+}
+
+garch_fit <- function(spec, data) {
+  is_error <- TRUE
+  k <- 0
+  n <- length(data)
+  opt_methods <- c("hybrid", "nloptr", "solnp", "gosolnp", "lbfgs", "nlminb")
+  while (is_error && k < length(opt_methods)) {
+    k <- k + 1
+    is_error <- FALSE
+    expr <- tryCatch({
+      fit_model <- ugarchfit(spec, data, solver = opt_methods[k])
+      warns <- character(0)
+      fc <- withCallingHandlers(
+        ugarchforecast(fit_model, n.ahead = 1),
+        warning = function(w) {
+          warns <<- c(warns, conditionMessage(w))
+          invokeRestart("muffleWarning")}
+      )
+      if (fit_model@fit$convergence != 0) stop("no convergence")
+      if (any(!is.finite(fc@forecast$sigmaFor))) stop("NaN or Inf in forecast")
+      if (any(grepl("Positivity Contraints", warns))) stop("Positivity Constraints NOT")
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+    if (!isTRUE(expr)) is_error <- TRUE
+  }
+  
+  if (is_error) stop("All optimization methods failed to converge.")
+  return(fit_model)
+}
+
+
 
 
 gas_fit <- function(spec, data) {
@@ -464,10 +544,10 @@ mcs_scoring_functions <- function(r_oos, var, es, alpha) {
   loss_al  <- sapply(seq_len(ncol(var)), function(i) AL(matrix(var[, i], ncol = 1), matrix(es[, i],  ncol = 1), r_oos, alpha = alpha))
   
   table_mcs <- matrix(0, ncol = ncol(var), nrow = 4)
-  table_mcs[1, estMCS.quick(loss_ql , test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
-  table_mcs[2, estMCS.quick(loss_fzg , test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
-  table_mcs[3, estMCS.quick(loss_nz , test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
-  table_mcs[4, estMCS.quick(loss_al , test = "t.range", B = 10000, l = 1, alpha = 0.25)] <- 1
+  table_mcs[1, estMCS.quick(loss_ql , test = "t.range", B = 10000, l = 21, alpha = 0.25)] <- 1
+  table_mcs[2, estMCS.quick(loss_fzg , test = "t.range", B = 10000, l = 21, alpha = 0.25)] <- 1
+  table_mcs[3, estMCS.quick(loss_nz , test = "t.range", B = 10000, l = 21, alpha = 0.25)] <- 1
+  table_mcs[4, estMCS.quick(loss_al , test = "t.range", B = 10000, l = 21, alpha = 0.25)] <- 1
   
   return(apply(table_mcs, 2, sum))
 }

@@ -27,7 +27,9 @@ data <- read_excel("./Data/capire_daily_returns.xlsx", skip = 3, col_types = c("
 
 data |> pivot_longer(cols = MMM:CRM, values_to = "returns", names_to = "stocks") |> 
   ggplot(aes(y = returns, x = Data, colour = stocks)) + geom_line() +
+  geom_vline(xintercept = as.Date("2019-12-09"), linetype = "dashed", linewidth = 0.8, colour = "black") +
   xlab("Year") + ylab("Returns") + theme_bw() + theme(legend.position = "none")
+
 
 data |> select(-Data) |> apply(2, descriptive_statistics) |> t() |> round(4) |> xtable(digits = 4)
 

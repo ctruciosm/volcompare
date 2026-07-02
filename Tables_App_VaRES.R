@@ -86,7 +86,7 @@ out_1 <- NULL
 out_2 <- NULL
 for (i in 1:K) { 
   print(i)
-  set.seed(1234)
+  set.seed(12345)
   r_oos <- datas_oos[,1 + i]
   
   hits1 <- round(c(mean(r_oos < var1_garch_n[, i]), mean(r_oos < var1_garch_t[, i]), 
@@ -156,45 +156,3 @@ for (i in seq_along(start)) {
 
 table_latex |> save_kable(file = "App_VaRES_2500.tex", keep_tex = TRUE)
 
-
-# Which one?
-K <- ncol(es2_garch_n)
-a1 <- 0.010
-a2 <- 0.025
-out_describe <- NULL
-for (i in 1:K) { 
-  print(i)
-  set.seed(1234)
-  r_oos <- datas_oos[,1 + i]
-  
-  tests1_describe <- c(paste(calibration_tests_describe(r_oos, var1_garch_n[, i], es1_garch_n[, i], s_garch_n[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_garch_t[, i], es1_garch_t[, i], s_garch_t[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_figarch_n[, i], es1_figarch_n[, i], s_figarch_n[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_figarch_t[, i], es1_figarch_t[, i], s_figarch_t[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_gas_n[, i], es1_gas_n[, i], s_gas_n[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_gas_t[, i], es1_gas_t[, i], s_gas_t[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_ms_n[, i], es1_ms_n[, i], s_ms_n[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_ms_t[, i], es1_ms_t[, i], s_ms_t[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_sv_n[, i], es1_sv_n[, i], s_sv_n[, i], alpha = a1), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var1_sv_t[, i], es1_sv_t[, i], s_sv_t[, i], alpha = a1), collapse = "-"))
-  
-  tests2_describe <- c(paste(calibration_tests_describe(r_oos, var2_garch_n[, i], es2_garch_n[, i], s_garch_n[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_garch_t[, i], es2_garch_t[, i], s_garch_t[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_figarch_n[, i], es2_figarch_n[, i], s_figarch_n[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_figarch_t[, i], es2_figarch_t[, i], s_figarch_t[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_gas_n[, i], es2_gas_n[, i], s_gas_n[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_gas_t[, i], es2_gas_t[, i], s_gas_t[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_ms_n[, i], es2_ms_n[, i], s_ms_n[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_ms_t[, i], es2_ms_t[, i], s_ms_t[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_sv_n[, i], es2_sv_n[, i], s_sv_n[, i], alpha = a2), collapse = "-"),
-                       paste(calibration_tests_describe(r_oos, var2_sv_t[, i], es2_sv_t[, i], s_sv_t[, i], alpha = a2), collapse = "-"))
-  
-  aux_describe <- rbind(c(tests1_describe, tests2_describe))
-  out_describe <- rbind(out_describe, aux_describe)
-}
-
-row.names(out_describe) <- colnames(es1_garch_n)
-colnames(out_describe) <- rep(c("GARCH-N", "GARCH-T", "FIGARCH-N", "FIGARCH-T", "GAS-N", "GAS-T", "MS-N", "MS-T", "SV-N", "SV-T"), 2)
-out_describe
-
-write.csv(out_describe, "VaR_ES_Described.csv")

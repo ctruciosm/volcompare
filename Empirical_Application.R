@@ -7,7 +7,6 @@ library(stringr)
 library(rugarch)
 library(GAS)
 library(stochvol)
-library(stochvolTMB)
 library(MSGARCH)
 library(future.apply)
 source("Utils_GARCH-GAS-SV.R")
@@ -38,15 +37,7 @@ garch_n_fore_var2 <- garch_t_fore_var2 <- figarch_n_fore_var2 <- figarch_t_fore_
 garch_n_fore_es1 <- garch_t_fore_es1 <- figarch_n_fore_es1 <- figarch_t_fore_es1 <- gas_n_fore_es1 <- gas_t_fore_es1 <- ms_n_fore_es1 <- ms_t_fore_es1 <- sv_n_fore_es1 <- sv_t_fore_es1 <- svb_n_fore_es1 <- svb_t_fore_es1 <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
 garch_n_fore_es2 <- garch_t_fore_es2 <- figarch_n_fore_es2 <- figarch_t_fore_es2 <- gas_n_fore_es2 <- gas_t_fore_es2 <- ms_n_fore_es2 <- ms_t_fore_es2 <- sv_n_fore_es2 <- sv_t_fore_es2 <- svb_n_fore_es2 <- svb_t_fore_es2 <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
 
-fhs_garch_n_fore_s2   <- fhs_garch_t_fore_s2    <- fhs_figarch_n_fore_s2    <- fhs_figarch_t_fore_s2    <- fhs_gas_n_fore_s2    <- fhs_gas_t_fore_s2    <- fhs_ms_n_fore_s2   <- fhs_ms_t_fore_s2   <- fhs_sv_n_fore_s2   <- fhs_sv_t_fore_s2   <- fhs_svb_n_fore_s2   <- fhs_svb_t_fore_s2   <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
-fhs_garch_n_fore_var1 <- fhs_garch_t_fore_var1  <- fhs_figarch_n_fore_var1  <- fhs_figarch_t_fore_var1  <- fhs_gas_n_fore_var1  <- fhs_gas_t_fore_var1  <- fhs_ms_n_fore_var1 <- fhs_ms_t_fore_var1 <- fhs_sv_n_fore_var1 <- fhs_sv_t_fore_var1 <- fhs_svb_n_fore_var1 <- fhs_svb_t_fore_var1 <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
-fhs_garch_n_fore_var2 <- fhs_garch_t_fore_var2  <- fhs_figarch_n_fore_var2  <- fhs_figarch_t_fore_var2  <- fhs_gas_n_fore_var2  <- fhs_gas_t_fore_var2  <- fhs_ms_n_fore_var2 <- fhs_ms_t_fore_var2 <- fhs_sv_n_fore_var2 <- fhs_sv_t_fore_var2 <- fhs_svb_n_fore_var2 <- fhs_svb_t_fore_var2 <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
-fhs_garch_n_fore_es1  <- fhs_garch_t_fore_es1   <- fhs_figarch_n_fore_es1   <- fhs_figarch_t_fore_es1   <- fhs_gas_n_fore_es1   <- fhs_gas_t_fore_es1   <- fhs_ms_n_fore_es1  <- fhs_ms_t_fore_es1  <- fhs_sv_n_fore_es1  <- fhs_sv_t_fore_es1  <- fhs_svb_n_fore_es1  <- fhs_svb_t_fore_es1  <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
-fhs_garch_n_fore_es2  <- fhs_garch_t_fore_es2   <- fhs_figarch_n_fore_es2   <- fhs_figarch_t_fore_es2   <- fhs_gas_n_fore_es2   <- fhs_gas_t_fore_es2   <- fhs_ms_n_fore_es2  <- fhs_ms_t_fore_es2  <- fhs_sv_n_fore_es2  <- fhs_sv_t_fore_es2  <- fhs_svb_n_fore_es2  <- fhs_svb_t_fore_es2  <- matrix(0, nrow = oos, ncol = ncol(data) - 1, dimnames = list(NULL, colnames(data)[-1]))
-
-
-
-plan(multicore, workers = parallel::detectCores() - 4)
+#plan(multicore, workers = parallel::detectCores() - 4)
 plan(sequential)
 for (i in 1:oos) {
   print(i)
@@ -64,33 +55,25 @@ for (i in 1:oos) {
   
   # Forecasting S2, VaR and ES
   garch_n_fore <- future_apply(returns_c, 2, function(x) {
-      fit <- ugarchfit(garch_spec_n, na.omit(x), solver = "hybrid")
+      fit <- garch_fit(garch_spec_n, na.omit(x)) #ugarchfit(garch_spec_n, na.omit(x), solver = "hybrid")
       alpha <- c(0.01, 0.025)
       e <- fit@fit$residuals / fit@fit$sigma
       sigma_fore <- ugarchforecast(fit, n.ahead = 1)@forecast$sigmaFor[1]
-      pre_var <- quantile(e, prob = alpha)
-      pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-      var <- pre_var * sigma_fore
-      es <- pre_es * sigma_fore
       var_par <- qdist(distribution = "norm", alpha, mu = 0, sigma = sigma_fore)
       es_par <- -sigma_fore * dnorm(qnorm(alpha)) / alpha
-      out <- c(sigma_fore, var, es, var_par, es_par)  
+      out <- c(sigma_fore, var_par, es_par)  
       return(out)
     }, future.seed = TRUE)
   garch_t_fore <- future_apply(returns_c, 2, function(x) {
-    fit <- ugarchfit(garch_spec_t, na.omit(x), solver = "hybrid")
+    fit <- garch_fit(garch_spec_t, na.omit(x)) #ugarchfit(garch_spec_t, na.omit(x), solver = "hybrid")
     alpha <- c(0.01, 0.025)
     e <- fit@fit$residuals / fit@fit$sigma
     sigma_fore <- ugarchforecast(fit, n.ahead = 1)@forecast$sigmaFor[1]
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     nu <- coef(fit)["shape"]
     k <- sqrt(nu / (nu - 2))
     var_par <- sigma_fore * qt(alpha, df = nu) / k
     es_par <- -sigma_fore / k * dt(qt(alpha, df = nu), df = nu) / alpha * (nu + qt(alpha, df = nu)^2) / (nu - 1)
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   figarch_n_fore <- future_apply(returns_c, 2, function(x) {
@@ -98,13 +81,9 @@ for (i in 1:oos) {
     alpha <- c(0.01, 0.025)
     e <- fit@fit$residuals / fit@fit$sigma
     sigma_fore <- ugarchforecast(fit, n.ahead = 1)@forecast$sigmaFor[1]
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_par <- qdist(distribution = "norm", alpha, mu = 0, sigma = sigma_fore)
     es_par <- -sigma_fore * dnorm(qnorm(alpha)) / alpha
-    out <- c(sigma_fore, var, es, var_par, es_par) 
+    out <- c(sigma_fore, var_par, es_par) 
     return(out)
   }, future.seed = TRUE)
   figarch_t_fore <- future_apply(returns_c, 2, function(x) {
@@ -112,15 +91,11 @@ for (i in 1:oos) {
     alpha <- c(0.01, 0.025)
     e <- fit@fit$residuals / fit@fit$sigma
     sigma_fore <- ugarchforecast(fit, n.ahead = 1)@forecast$sigmaFor[1]
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     nu <- coef(fit)["shape"]
     k <- sqrt(nu / (nu - 2))
     var_par <- sigma_fore * qt(alpha, df = nu) / k
     es_par <- -sigma_fore / k * dt(qt(alpha, df = nu), df = nu) / alpha * (nu + qt(alpha, df = nu)^2) / (nu - 1)
-    out <- c(sigma_fore, var, es, var_par, es_par)
+    out <- c(sigma_fore, var_par, es_par)
     return(out)
   }, future.seed = TRUE)
   gas_n_fore <- future_apply(returns_c, 2, function(x) {
@@ -129,13 +104,9 @@ for (i in 1:oos) {
     sigma <- sqrt(fit@GASDyn$mTheta[2, ])
     e <- fit@Data$vY / sigma[1 : length(fit@Data$vY)]
     sigma_fore <- tail(sigma, 1)
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_par <- as.numeric(tail(quantile(fit, prob =  alpha), 1))
     es_par <- as.numeric(tail(ES(fit, prob = alpha), 1))
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   gas_t_fore <- future_apply(returns_c, 2, function(x) {
@@ -144,13 +115,9 @@ for (i in 1:oos) {
     sigma <- sqrt(fit@GASDyn$mTheta[2, ] * fit@GASDyn$mTheta[3, 1] /(fit@GASDyn$mTheta[3, 1] - 2))
     e <- fit@Data$vY / sigma[1 : length(fit@Data$vY)]
     sigma_fore <- tail(sigma, 1)
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_par <- as.numeric(tail(quantile(fit, prob =  alpha), 1))
     es_par <- as.numeric(tail(ES(fit, prob = alpha), 1))
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   ms_n_fore <- future_apply(returns_c, 2, function(x) {
@@ -158,14 +125,10 @@ for (i in 1:oos) {
     alpha <- c(0.01, 0.025)
     e <- fit$data / Volatility(fit)
     sigma_fore <- predict(fit, nahead = 1)$vol
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_es <- Risk(fit, nahead = 1, alpha = alpha)
     var_par <- var_es$VaR
     es_par <- var_es$ES
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   ms_t_fore <- future_apply(returns_c, 2, function(x) {
@@ -173,47 +136,34 @@ for (i in 1:oos) {
     alpha <- c(0.01, 0.025)
     e <- fit$data / Volatility(fit)
     sigma_fore <- predict(fit, nahead = 1)$vol
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_es <- Risk(fit, nahead = 1, alpha = alpha)
     var_par <- var_es$VaR
     es_par <- var_es$ES
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   svb_n_fore <- future_apply(returns_c, 2, function(x) {
-    fit <- svsample(as.numeric(na.omit(x)))
+    fit <- svsample(as.numeric(na.omit(x)), quiet = TRUE)
     alpha <- c(0.01, 0.025)
-    e <- fit$y / as.numeric(apply(exp(fit$latent[[1]] / 2), 2, mean))
+    e <- fit$y / as.numeric(colMeans(exp(fit$latent[[1]]/ 2)))
     aux <- predict(fit, steps = 1)
     sigma_fore <- mean(aux$vol[[1]])
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_par <- quantile(aux$y[[1]], alpha)
     es_par <- sapply(var_par, function(v) mean(aux$y[[1]][aux$y[[1]] < v]))
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
   svb_t_fore <- future_apply(returns_c, 2, function(x) {
-    fit <- svtsample(as.numeric(na.omit(x)))
+    fit <- svtsample(as.numeric(na.omit(x)), quiet = TRUE)
     alpha <- c(0.01, 0.025)
-    e <- fit$y / as.numeric(apply(exp(fit$latent[[1]] / 2), 2, mean))
+    e <- fit$y / as.numeric(colMeans(exp(fit$latent[[1]]/ 2)))
     aux <- predict(fit, steps = 1)
     sigma_fore <- mean(aux$vol[[1]])
-    pre_var <- quantile(e, prob = alpha)
-    pre_es <- sapply(pre_var, function(v) mean(e[e < v]))
-    var <- pre_var * sigma_fore
-    es <- pre_es * sigma_fore
     var_par <- quantile(aux$y[[1]], alpha)
     es_par <- sapply(var_par, function(v) mean(aux$y[[1]][aux$y[[1]] < v]))
-    out <- c(sigma_fore, var, es, var_par, es_par)  
+    out <- c(sigma_fore, var_par, es_par)  
     return(out)
   }, future.seed = TRUE)
-  
   
   # Saving results
   garch_n_fore_s[i, ]    <-  garch_n_fore[1, ]
@@ -227,93 +177,49 @@ for (i in 1:oos) {
   ms_n_fore_s[i, ]       <-  ms_n_fore[1, ]
   ms_t_fore_s[i, ]       <-  ms_t_fore[1, ]
   
-  fhs_garch_n_fore_var1[i, ]    <-  garch_n_fore[2, ] + mu
-  fhs_garch_t_fore_var1[i, ]    <-  garch_t_fore[2, ] + mu
-  fhs_figarch_n_fore_var1[i, ]  <-  figarch_n_fore[2, ] + mu
-  fhs_figarch_t_fore_var1[i, ]  <-  figarch_t_fore[2, ] + mu
-  fhs_gas_n_fore_var1[i, ]      <-  gas_n_fore[2, ] + mu
-  fhs_gas_t_fore_var1[i, ]      <-  gas_t_fore[2, ] + mu
-  fhs_sv_n_fore_var1[i, ]       <-  svb_n_fore[2, ] + mu
-  fhs_sv_t_fore_var1[i, ]       <-  svb_t_fore[2, ] + mu
-  fhs_ms_n_fore_var1[i, ]       <-  ms_n_fore[2, ] + mu
-  fhs_ms_t_fore_var1[i, ]       <-  ms_t_fore[2, ] + mu
+  garch_n_fore_var1[i, ]    <-  garch_n_fore[2, ] + mu
+  garch_t_fore_var1[i, ]    <-  garch_t_fore[2, ] + mu
+  figarch_n_fore_var1[i, ]  <-  figarch_n_fore[2, ] + mu
+  figarch_t_fore_var1[i, ]  <-  figarch_t_fore[2, ] + mu
+  gas_n_fore_var1[i, ]      <-  gas_n_fore[2, ] + mu
+  gas_t_fore_var1[i, ]      <-  gas_t_fore[2, ] + mu
+  sv_n_fore_var1[i, ]       <-  svb_n_fore[2, ] + mu
+  sv_t_fore_var1[i, ]       <-  svb_t_fore[2, ] + mu
+  ms_n_fore_var1[i, ]       <-  ms_n_fore[2, ] + mu
+  ms_t_fore_var1[i, ]       <-  ms_t_fore[2, ] + mu
   
-  fhs_garch_n_fore_var2[i, ]    <-  garch_n_fore[3, ] + mu
-  fhs_garch_t_fore_var2[i, ]    <-  garch_t_fore[3, ] + mu
-  fhs_figarch_n_fore_var2[i, ]  <-  figarch_n_fore[3, ] + mu
-  fhs_figarch_t_fore_var2[i, ]  <-  figarch_t_fore[3, ] + mu
-  fhs_gas_n_fore_var2[i, ]      <-  gas_n_fore[3, ] + mu
-  fhs_gas_t_fore_var2[i, ]      <-  gas_t_fore[3, ] + mu
-  fhs_sv_n_fore_var2[i, ]       <-  svb_n_fore[3, ] + mu
-  fhs_sv_t_fore_var2[i, ]       <-  svb_t_fore[3, ] + mu
-  fhs_ms_n_fore_var2[i, ]       <-  ms_n_fore[3, ] + mu
-  fhs_ms_t_fore_var2[i, ]       <-  ms_t_fore[3, ] + mu
+  garch_n_fore_var2[i, ]    <-  garch_n_fore[3, ] + mu
+  garch_t_fore_var2[i, ]    <-  garch_t_fore[3, ] + mu
+  figarch_n_fore_var2[i, ]  <-  figarch_n_fore[3, ] + mu
+  figarch_t_fore_var2[i, ]  <-  figarch_t_fore[3, ] + mu
+  gas_n_fore_var2[i, ]      <-  gas_n_fore[3, ] + mu
+  gas_t_fore_var2[i, ]      <-  gas_t_fore[3, ] + mu
+  sv_n_fore_var2[i, ]       <-  svb_n_fore[3, ] + mu
+  sv_t_fore_var2[i, ]       <-  svb_t_fore[3, ] + mu
+  ms_n_fore_var2[i, ]       <-  ms_n_fore[3, ] + mu
+  ms_t_fore_var2[i, ]       <-  ms_t_fore[3, ] + mu
   
-  fhs_garch_n_fore_es1[i, ]    <-  garch_n_fore[4, ] + mu
-  fhs_garch_t_fore_es1[i, ]    <-  garch_t_fore[4, ] + mu
-  fhs_figarch_n_fore_es1[i, ]  <-  figarch_n_fore[4, ] + mu
-  fhs_figarch_t_fore_es1[i, ]  <-  figarch_t_fore[4, ] + mu
-  fhs_gas_n_fore_es1[i, ]      <-  gas_n_fore[4, ] + mu
-  fhs_gas_t_fore_es1[i, ]      <-  gas_t_fore[4, ] + mu
-  fhs_sv_n_fore_es1[i, ]       <-  svb_n_fore[4, ] + mu
-  fhs_sv_t_fore_es1[i, ]       <-  svb_t_fore[4, ] + mu
-  fhs_ms_n_fore_es1[i, ]       <-  ms_n_fore[4, ] + mu
-  fhs_ms_t_fore_es1[i, ]       <-  ms_t_fore[4, ] + mu
+  garch_n_fore_es1[i, ]    <-  garch_n_fore[4, ] + mu
+  garch_t_fore_es1[i, ]    <-  garch_t_fore[4, ] + mu
+  figarch_n_fore_es1[i, ]  <-  figarch_n_fore[4, ] + mu
+  figarch_t_fore_es1[i, ]  <-  figarch_t_fore[4, ] + mu
+  gas_n_fore_es1[i, ]      <-  gas_n_fore[4, ] + mu
+  gas_t_fore_es1[i, ]      <-  gas_t_fore[4, ] + mu
+  sv_n_fore_es1[i, ]       <-  svb_n_fore[4, ] + mu
+  sv_t_fore_es1[i, ]       <-  svb_t_fore[4, ] + mu
+  ms_n_fore_es1[i, ]       <-  ms_n_fore[4, ] + mu
+  ms_t_fore_es1[i, ]       <-  ms_t_fore[4, ] + mu
   
-  fhs_garch_n_fore_es2[i, ]    <-  garch_n_fore[5, ] + mu
-  fhs_garch_t_fore_es2[i, ]    <-  garch_t_fore[5, ] + mu
-  fhs_figarch_n_fore_es2[i, ]  <-  figarch_n_fore[5, ] + mu
-  fhs_figarch_t_fore_es2[i, ]  <-  figarch_t_fore[5, ] + mu
-  fhs_gas_n_fore_es2[i, ]      <-  gas_n_fore[5, ] + mu
-  fhs_gas_t_fore_es2[i, ]      <-  gas_t_fore[5, ] + mu
-  fhs_sv_n_fore_es2[i, ]       <-  svb_n_fore[5, ] + mu
-  fhs_sv_t_fore_es2[i, ]       <-  svb_t_fore[5, ] + mu
-  fhs_ms_n_fore_es2[i, ]       <-  ms_n_fore[5, ] + mu
-  fhs_ms_t_fore_es2[i, ]       <-  ms_t_fore[5, ] + mu
-  
-  garch_n_fore_var1[i, ]    <-  garch_n_fore[6, ] + mu
-  garch_t_fore_var1[i, ]    <-  garch_t_fore[6, ] + mu
-  figarch_n_fore_var1[i, ]  <-  figarch_n_fore[6, ] + mu
-  figarch_t_fore_var1[i, ]  <-  figarch_t_fore[6, ] + mu
-  gas_n_fore_var1[i, ]      <-  gas_n_fore[6, ] + mu
-  gas_t_fore_var1[i, ]      <-  gas_t_fore[6, ] + mu
-  sv_n_fore_var1[i, ]       <-  svb_n_fore[6, ] + mu
-  sv_t_fore_var1[i, ]       <-  svb_t_fore[6, ] + mu
-  ms_n_fore_var1[i, ]       <-  ms_n_fore[6, ] + mu
-  ms_t_fore_var1[i, ]       <-  ms_t_fore[6, ] + mu
-  
-  garch_n_fore_var2[i, ]    <-  garch_n_fore[7, ] + mu
-  garch_t_fore_var2[i, ]    <-  garch_t_fore[7, ] + mu
-  figarch_n_fore_var2[i, ]  <-  figarch_n_fore[7, ] + mu
-  figarch_t_fore_var2[i, ]  <-  figarch_t_fore[7, ] + mu
-  gas_n_fore_var2[i, ]      <-  gas_n_fore[7, ] + mu
-  gas_t_fore_var2[i, ]      <-  gas_t_fore[7, ] + mu
-  sv_n_fore_var2[i, ]       <-  svb_n_fore[7, ] + mu
-  sv_t_fore_var2[i, ]       <-  svb_t_fore[7, ] + mu
-  ms_n_fore_var2[i, ]       <-  ms_n_fore[7, ] + mu
-  ms_t_fore_var2[i, ]       <-  ms_t_fore[7, ] + mu
-  
-  garch_n_fore_es1[i, ]    <-  garch_n_fore[8, ] + mu
-  garch_t_fore_es1[i, ]    <-  garch_t_fore[8, ] + mu
-  figarch_n_fore_es1[i, ]  <-  figarch_n_fore[8, ] + mu
-  figarch_t_fore_es1[i, ]  <-  figarch_t_fore[8, ] + mu
-  gas_n_fore_es1[i, ]      <-  gas_n_fore[8, ] + mu
-  gas_t_fore_es1[i, ]      <-  gas_t_fore[8, ] + mu
-  sv_n_fore_es1[i, ]       <-  svb_n_fore[8, ] + mu
-  sv_t_fore_es1[i, ]       <-  svb_t_fore[8, ] + mu
-  ms_n_fore_es1[i, ]       <-  ms_n_fore[8, ] + mu
-  ms_t_fore_es1[i, ]       <-  ms_t_fore[8, ] + mu
-  
-  garch_n_fore_es2[i, ]    <-  garch_n_fore[9, ] + mu
-  garch_t_fore_es2[i, ]    <-  garch_t_fore[9, ] + mu
-  figarch_n_fore_es2[i, ]  <-  figarch_n_fore[9, ] + mu
-  figarch_t_fore_es2[i, ]  <-  figarch_t_fore[9, ] + mu
-  gas_n_fore_es2[i, ]      <-  gas_n_fore[9, ] + mu
-  gas_t_fore_es2[i, ]      <-  gas_t_fore[9, ] + mu
-  sv_n_fore_es2[i, ]       <-  svb_n_fore[9, ] + mu
-  sv_t_fore_es2[i, ]       <-  svb_t_fore[9, ] + mu
-  ms_n_fore_es2[i, ]       <-  ms_n_fore[9, ] + mu
-  ms_t_fore_es2[i, ]       <-  ms_t_fore[9, ] + mu
+  garch_n_fore_es2[i, ]    <-  garch_n_fore[5, ] + mu
+  garch_t_fore_es2[i, ]    <-  garch_t_fore[5, ] + mu
+  figarch_n_fore_es2[i, ]  <-  figarch_n_fore[5, ] + mu
+  figarch_t_fore_es2[i, ]  <-  figarch_t_fore[5, ] + mu
+  gas_n_fore_es2[i, ]      <-  gas_n_fore[5, ] + mu
+  gas_t_fore_es2[i, ]      <-  gas_t_fore[5, ] + mu
+  sv_n_fore_es2[i, ]       <-  svb_n_fore[5, ] + mu
+  sv_t_fore_es2[i, ]       <-  svb_t_fore[5, ] + mu
+  ms_n_fore_es2[i, ]       <-  ms_n_fore[5, ] + mu
+  ms_t_fore_es2[i, ]       <-  ms_t_fore[5, ] + mu
 }
 
 
@@ -339,17 +245,6 @@ write.csv(ms_t_fore_var1, "Empirical_Application/ms_t_fore_var1_2500.csv")
 write.csv(sv_n_fore_var1, "Empirical_Application/sv_n_fore_var1_2500.csv")
 write.csv(sv_t_fore_var1, "Empirical_Application/sv_t_fore_var1_2500.csv")
   
-write.csv(fhs_garch_n_fore_var1, "Empirical_Application/fhs_garch_n_fore_var1_2500.csv")
-write.csv(fhs_garch_t_fore_var1, "Empirical_Application/fhs_garch_t_fore_var1_2500.csv")
-write.csv(fhs_figarch_n_fore_var1, "Empirical_Application/fhs_figarch_n_fore_var1_2500.csv")
-write.csv(fhs_figarch_t_fore_var1, "Empirical_Application/fhs_figarch_t_fore_var1_2500.csv")
-write.csv(fhs_gas_n_fore_var1, "Empirical_Application/fhs_gas_n_fore_var1_2500.csv")
-write.csv(fhs_gas_t_fore_var1, "Empirical_Application/fhs_gas_t_fore_var1_2500.csv")
-write.csv(fhs_ms_n_fore_var1, "Empirical_Application/fhs_ms_n_fore_var1_2500.csv")
-write.csv(fhs_ms_t_fore_var1, "Empirical_Application/fhs_ms_t_fore_var1_2500.csv")
-write.csv(fhs_sv_n_fore_var1, "Empirical_Application/fhs_sv_n_fore_var1_2500.csv")
-write.csv(fhs_sv_t_fore_var1, "Empirical_Application/fhs_sv_t_fore_var1_2500.csv")
-
 write.csv(garch_n_fore_var2, "Empirical_Application/garch_n_fore_var2_2500.csv")
 write.csv(garch_t_fore_var2, "Empirical_Application/garch_t_fore_var2_2500.csv")
 write.csv(figarch_n_fore_var2, "Empirical_Application/figarch_n_fore_var2_2500.csv")
@@ -360,17 +255,6 @@ write.csv(ms_n_fore_var2, "Empirical_Application/ms_n_fore_var2_2500.csv")
 write.csv(ms_t_fore_var2, "Empirical_Application/ms_t_fore_var2_2500.csv")
 write.csv(sv_n_fore_var2, "Empirical_Application/sv_n_fore_var2_2500.csv")
 write.csv(sv_t_fore_var2, "Empirical_Application/sv_t_fore_var2_2500.csv")
-
-write.csv(fhs_garch_n_fore_var2, "Empirical_Application/fhs_garch_n_fore_var2_2500.csv")
-write.csv(fhs_garch_t_fore_var2, "Empirical_Application/fhs_garch_t_fore_var2_2500.csv")
-write.csv(fhs_figarch_n_fore_var2, "Empirical_Application/fhs_figarch_n_fore_var2_2500.csv")
-write.csv(fhs_figarch_t_fore_var2, "Empirical_Application/fhs_figarch_t_fore_var2_2500.csv")
-write.csv(fhs_gas_n_fore_var2, "Empirical_Application/fhs_gas_n_fore_var2_2500.csv")
-write.csv(fhs_gas_t_fore_var2, "Empirical_Application/fhs_gas_t_fore_var2_2500.csv")
-write.csv(fhs_ms_n_fore_var2, "Empirical_Application/fhs_ms_n_fore_var2_2500.csv")
-write.csv(fhs_ms_t_fore_var2, "Empirical_Application/fhs_ms_t_fore_var2_2500.csv")
-write.csv(fhs_sv_n_fore_var2, "Empirical_Application/fhs_sv_n_fore_var2_2500.csv")
-write.csv(fhs_sv_t_fore_var2, "Empirical_Application/fhs_sv_t_fore_var2_2500.csv")
 
 write.csv(garch_n_fore_es1, "Empirical_Application/garch_n_fore_es1_2500.csv")
 write.csv(garch_t_fore_es1, "Empirical_Application/garch_t_fore_es1_2500.csv")
@@ -383,17 +267,6 @@ write.csv(ms_t_fore_es1, "Empirical_Application/ms_t_fore_es1_2500.csv")
 write.csv(sv_n_fore_es1, "Empirical_Application/sv_n_fore_es1_2500.csv")
 write.csv(sv_t_fore_es1, "Empirical_Application/sv_t_fore_es1_2500.csv")
 
-write.csv(fhs_garch_n_fore_es1, "Empirical_Application/fhs_garch_n_fore_es1_2500.csv")
-write.csv(fhs_garch_t_fore_es1, "Empirical_Application/fhs_garch_t_fore_es1_2500.csv")
-write.csv(fhs_figarch_n_fore_es1, "Empirical_Application/fhs_figarch_n_fore_es1_2500.csv")
-write.csv(fhs_figarch_t_fore_es1, "Empirical_Application/fhs_figarch_t_fore_es1_2500.csv")
-write.csv(fhs_gas_n_fore_es1, "Empirical_Application/fhs_gas_n_fore_es1_2500.csv")
-write.csv(fhs_gas_t_fore_es1, "Empirical_Application/fhs_gas_t_fore_es1_2500.csv")
-write.csv(fhs_ms_n_fore_es1, "Empirical_Application/fhs_ms_n_fore_es1_2500.csv")
-write.csv(fhs_ms_t_fore_es1, "Empirical_Application/fhs_ms_t_fore_es1_2500.csv")
-write.csv(fhs_sv_n_fore_es1, "Empirical_Application/fhs_sv_n_fore_es1_2500.csv")
-write.csv(fhs_sv_t_fore_es1, "Empirical_Application/fhs_sv_t_fore_es1_2500.csv")
-
 write.csv(garch_n_fore_es2, "Empirical_Application/garch_n_fore_es2_2500.csv")
 write.csv(garch_t_fore_es2, "Empirical_Application/garch_t_fore_es2_2500.csv")
 write.csv(figarch_n_fore_es2, "Empirical_Application/figarch_n_fore_es2_2500.csv")
@@ -404,16 +277,5 @@ write.csv(ms_n_fore_es2, "Empirical_Application/ms_n_fore_es2_2500.csv")
 write.csv(ms_t_fore_es2, "Empirical_Application/ms_t_fore_es2_2500.csv")
 write.csv(sv_n_fore_es2, "Empirical_Application/sv_n_fore_es2_2500.csv")
 write.csv(sv_t_fore_es2, "Empirical_Application/sv_t_fore_es2_2500.csv")
-
-write.csv(fhs_garch_n_fore_es2, "Empirical_Application/fhs_garch_n_fore_es2_2500.csv")
-write.csv(fhs_garch_t_fore_es2, "Empirical_Application/fhs_garch_t_fore_es2_2500.csv")
-write.csv(fhs_figarch_n_fore_es2, "Empirical_Application/fhs_figarch_n_fore_es2_2500.csv")
-write.csv(fhs_figarch_t_fore_es2, "Empirical_Application/fhs_figarch_t_fore_es2_2500.csv")
-write.csv(fhs_gas_n_fore_es2, "Empirical_Application/fhs_gas_n_fore_es2_2500.csv")
-write.csv(fhs_gas_t_fore_es2, "Empirical_Application/fhs_gas_t_fore_es2_2500.csv")
-write.csv(fhs_ms_n_fore_es2, "Empirical_Application/fhs_ms_n_fore_es2_2500.csv")
-write.csv(fhs_ms_t_fore_es2, "Empirical_Application/fhs_ms_t_fore_es2_2500.csv")
-write.csv(fhs_sv_n_fore_es2, "Empirical_Application/fhs_sv_n_fore_es2_2500.csv")
-write.csv(fhs_sv_t_fore_es2, "Empirical_Application/fhs_sv_t_fore_es2_2500.csv")
 
 write.csv(data[(1 + 2500):nrow(data), ], "Empirical_Application/data_oos_2500.csv")
