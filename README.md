@@ -28,4 +28,4 @@ This repository contains the codes used to replicate the results in Marques and 
 
 ## References
 
-Marques, F. and Trucíos C. (2025). *"GARCH, GAS, SV, and MSGARCH models: Do we really need all of them for forecasting daily volatility?".* Submitted
+Marques, F. and Trucíos C. (2026). *"Daily Volatility Forecasting with Off-the-Shelf Models: A Comparative Study Under Stress".* Submitted
