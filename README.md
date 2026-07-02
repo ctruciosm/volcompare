@@ -1,27 +1,29 @@
 # Replication Codes
 
-This repository contains the codes used to replicate the results in Marques and Trucíos (2025).
+This repository contains the codes used to replicate the results in Marques and Trucíos (2026).
 
 ### Empirical Application
 
-- `Empirical_Application.R` computes one-step-ahead conditional variances using GARCH, SV, GAS, and MSGARCH models, each with both standardized Normal and Student-t innovation distributions.
-- `Tables_App.R` generates the tables and performs the Model Confidence Set procedure for the empirical application results.
+- `Empirical_Application.R` computes one-step-ahead conditional variances and one-step-ahead VaR and ES for the daily returns series of the constituents of the Dow Jones Industrial Average Index.
+- `Tables_App.R` Performs the Model Confidence Set procedure for the empirical application results (also generates the Tables 5 in the main manuscript and 10 in the Supplementary Material).
+- `Tables_App_VaR_ES.R` Performs the calibration tests and apply the MCS to the scoringh functions for the VaR and ES (also generates Table 6)
 
 > Five-minute realized variances are freely available from the [CaPiRe](https://capire.stat.unipd.it/) database. Daily returns were obtained from Economatica.
 
 ### Monte Carlo Simulation
 
-- `MonteCarlo_GARCH-GAS-SV-MS.R` runs the one-step-ahead forecasting experiment. To use the code, modify the parameters accordingly, or execute it in batch mode using the following command:  
-  `R CMD BATCH "--args n=2500 type=BR outliers=FALSE" MonteCarlo_GARCH-GAS-SV-MS.R MonteCarlo_2500_BR_FALSE.txt &`  
-  (You can change `BR` to `US`, `FALSE` to `TRUE`, or adjust the sample size as desired.)
-- `Tables_MC.R` reproduces the results shown in Tables 3 to 6 of the paper.
-- `Model_Confidence_Set_MC.R` performs the Model Confidence Set procedure for the simulation study.
+- `MonteCarloSimulation.R` runs the one-step-ahead forecasting experiment. To use the code, modify the parameters accordingly, or execute it in batch mode using, for instance, the following command:  
+  `R CMD BATCH "--args GARCH-N BR" MonteCarloSimulations.R MonteCarlo_GARCH-N_BR.txt &`  
+  (You can change `BR` to `US`, `FALSE` to `TRUE`.)
+- `Tables_MonteCarlo.R` reproduces the results shown in Tables 2 and 3 of the main manuscript as well as Tables 4 - 9 in the Supplementary Material
+- `Aux_MonteCarlo.R` reproduces Table 1 in the Supplementary Material.
+- `MonteCarloSimulations_Larger_Sample` reproduces Table 2 in the Supplementary Material.
 
 ### Auxiliary Functions
 
 - `DGPs.R` defines the data-generating processes used in the simulations.
-- `Utils_GARCH-GAS-SV.R` contains additional functions for model estimation and forecasting.
-- `Descriptive_Statistics` displays the descriptive statistics in Table 7.
+- `Utils_GARCH-GAS-SV.R` and `utils.cpp` contain additional functions for model estimation and forecasting.
+- `Descriptive_Statistics` displays the descriptive statistics in Table 4.
 
 
 ## References
