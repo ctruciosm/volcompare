@@ -12,7 +12,7 @@ source("Utils_GARCH-GAS-SV.R")
 
 
 n_ins <- 2500
-rm <- "bpv"
+rm <- "rv"
 
 if (n_ins == 2500){
   datas_oos <- read.csv("./Empirical_Application/data_oos_2500.csv")[, -1]
